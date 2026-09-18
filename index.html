@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metin Kutusu Aracı</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  body { background:#0a0a14; color:#fff; height:100vh; display:flex; flex-direction:column; padding:12px; gap:12px; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  h1 { font-size:16px; color:#667eea; }
+  .info { font-size:11px; color:#888; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  button {
+    padding:10px 16px; background:#667eea; color:#fff; border:none;
+    border-radius:8px; font-weight:700; cursor:pointer; font-size:13px;
+    display:inline-flex; align-items:center; gap:6px; transition:background 0.15s;
+  }
+  button:hover { background:#5568d3; }
+  button.green { background:#27ae60; }
+  button.green:hover { background:#1e8449; }
+  button.orange { background:#e67e22; }
+  button.orange:hover { background:#ca6f1e; }
+  button.red { background:#e74c3c; }
+  button.red:hover { background:#c0392b; }
+  button.gray { background:#333; }
+  button.gray:hover { background:#444; }
+  .status {
+    padding:8px 12px; background:#1a1a2e; border-radius:8px; font-size:12px;
+    color:#27ae60; display:none; border-left:3px solid #27ae60;
+  }
+  .status.error { color:#e74c3c; border-color:#e74c3c; }
+  .status.active { display:block; }
+  textarea {
+    flex:1; width:100%; padding:14px; background:#1a1a2e; color:#e0e0e0;
+    border:1px solid #333; border-radius:10px; font-family:'Consolas', 'Monaco', monospace;
+    font-size:12px; line-height:1.5; outline:none; resize:none;
+    overflow-y:auto; overflow-x:auto; white-space:pre; word-wrap:normal;
+  }
+  textarea:focus { border-color:#667eea; }
+  .meta { display:flex; justify-content:space-between; font-size:11px; color:#666; padding:0 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📋 Metin Kutusu Aracı</h1>
+    <div class="info">Kodu yapıştır → Kopyala veya TXT İndir</div>
+  </div>
+  <div class="btns">
+    <button class="green" onclick="copyText()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Kopyala
+    </button>
+    <button class="orange" onclick="downloadTxt()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      TXT İndir
+    </button>
+    <button class="gray" onclick="clearAll()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+      Temizle
+    </button>
+  </div>
+</header>
+
+<div id="status" class="status"></div>
+
+<textarea id="content" placeholder="index.html kodunu buraya yapıştır..."></textarea>
+
+<div class="meta">
+  <span id="charCount">0 karakter</span>
+  <span id="lineCount">0 satır</span>
+</div>
+
+<script>
+  const ta = document.getElementById('content');
+  const status = document.getElementById('status');
+  const charCount = document.getElementById('charCount');
+  const lineCount = document.getElementById('lineCount');
+
+  // ⚡ Otomatik ``` ile sarma
+  let isWrapped = false;
+
+  function updateCounts() {
+    const val = ta.value;
+    charCount.textContent = val.length.toLocaleString('tr-TR') + ' karakter';
+    lineCount.textContent = val.split('\n').length.toLocaleString('tr-TR') + ' satır';
+  }
+
+  ta.addEventListener('input', updateCounts);
+
+  // ⚡ Yapıştırınca otomatik ``` sarma
+  ta.addEventListener('paste', (e) => {
+    // Zaten sarmalıysa tekrar sarma
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if (text.trim().startsWith('```') && text.trim().endsWith('```')) {
+      return; // olduğu gibi bırak
+    }
+    // Sarmasız yapıştırılırsa sonra sarma butonuyla sarmasını öner
+  });
+
+  function showStatus(msg, isError = false) {
+    status.textContent = msg;
+    status.className = 'status active' + (isError ? ' error' : '');
+    clearTimeout(status._timer);
+    status._timer = setTimeout(() => {
+      status.classList.remove('active');
+    }, 2500);
+  }
+
+  function wrapIfNeeded() {
+    let val = ta.value;
+    if (!val.trim()) return '';
+    // Zaten sarmalı mı?
+    const trimmed = val.trim();
+    if (trimmed.startsWith('```') && trimmed.endsWith('```')) {
+      return val; // olduğu gibi
+    }
+    // Sar
+    return '```\n' + val + '\n```';
+  }
+
+  async function copyText() {
+    const text = wrapIfNeeded();
+    if (!text) {
+      showStatus('Kutu boş!', true);
+      return;
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        showStatus('✅ Panoya kopyalandı (' + text.length.toLocaleString('tr-TR') + ' karakter)');
+      } else {
+        // Fallback
+        const ta2 = document.createElement('textarea');
+        ta2.value = text;
+        ta2.style.position = 'fixed';
+        ta2.style.top = '-9999px';
+        document.body.appendChild(ta2);
+        ta2.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta2);
+        showStatus('✅ Panoya kopyalandı');
+      }
+    } catch (e) {
+      showStatus('❌ Kopyalanamadı: ' + e.message, true);
+    }
+  }
+
+  function downloadTxt() {
+    const text = wrapIfNeeded();
+    if (!text) {
+      showStatus('Kutu boş!', true);
+      return;
+    }
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'index.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showStatus('✅ TXT indirildi');
+  }
+
+  function clearAll() {
+    if (ta.value && !confirm('İçeriği silmek istediğine emin misin?')) return;
+    ta.value = '';
+    updateCounts();
+    showStatus('Temizlendi');
+  }
+
+  // ⚡ Ctrl+A seç, Ctrl+C kopyala doğal çalışsın
+  // Ama sayfa yenilenmesini engelle
+  window.addEventListener('beforeunload', (e) => {
+    if (ta.value && ta.value.length > 100) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  updateCounts();
+</script>
+
+</body>
+</html>
